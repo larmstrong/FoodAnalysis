@@ -49,32 +49,37 @@ class EpicuriousSpider (scrapy.Spider) :
     name = "epicurious_spider"
     css_str = ' div#sitemapItems'
     xpath_ul_str = './/div/h3[contains(text(), "Recipes")]/following-sibling::ul'
-    xpath_recipelink_str = './/li/a'
+    xpath_recipelink_str = './/li/a/@href'
 
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    # Class-specific methods
+    # EpicuriousSpider.start_requests: Initiate the web-crawling process.
+    # Parameters:
+    #   self: Object instance
     def start_requests (self) :
         urls = ['https://www.epicurious.com/services/sitemap']
         for url in urls :
             logger.debug('***\n{}'.format(url))
             yield scrapy.Request(url=url, callback=self.parse_sitemap)
 
+    #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    # EpicuriousSpider.parse_sitemap: Process the basic web structure of the Epicurious.com
+    #   sitemap. The primary flow is to obtain a list of year-organized URLs and then crawl each URL.
+    # Parameters:
+    #   self: Object instance
+    #   response: Selector object provided by invoking parent method.
     def parse_sitemap (self, response) :
-        # Obtain the sitemap items <div>.
-        # Since the HTML may not be well-formed we start with a CSS selector.
-        sitemapitems = response.css(self.css_str)
+        # Obtain URLs from Epicurious sitemap page.
+        # (1) Since the HTML may not be well-formed, start with a CSS selector.
+        # (2) Then select all <div>s following any <h3> tags that include the word 'recipe.'
+        # (3) Then gather the URLs that are contained in individual list items.
+        sitemapitems = response.css(self.css_str).xpath(self.xpath_ul_str).xpath(self.xpath_recipelink_str)
         logger.debug('Sitemapitems: {}'.format(sitemapitems.getall()))
-        for sm_item in sitemapitems:
-            # Within the sitemap div we want to select all <div>s following any <h3> tags that
-            # include the word 'recipe.'
-            ulitems = sitemapitems.xpath(self.xpath_ul_str)
-            logger.debug('UL Items: {}'.format(ulitems))
-            for ul_item in ulitems :
-                # Process each UL separately in case we want to treat stock recipes differently
-                # than member-submitted recipes.
-                listitems = ul_item.xpath()
-                for li_link in ul_item :
+        # Follow each URL for receipes.
+        for link in sitemapitems:
+            yield response.follow(url = link, callback = self.parse_yearpage)
 
+    def parse_yearpage (self, response) :
+        logger.debug(response.css(self.css_str).getall())
 
 #--------------------------------------------------------------------------------------------------
 
