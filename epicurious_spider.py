@@ -8,14 +8,14 @@ import scrapy
 from scrapy.crawler import CrawlerProcess
 
 #--------------------------------------------------------------------------------------------------
-#% Define Constants
+# Define Constants
 
 # Directory and filename constants.
 CURRENTDIR = os.path.dirname(os.path.realpath(os.curdir))     # Current working directory
 LOGFILENAME = 'epicurious_spider.log'
 
 #--------------------------------------------------------------------------------------------------
-#% Set up Logging
+# Set up Logging
 
 # Create a logger object
 logger = logging.getLogger('epicurious_spider_log')
@@ -41,15 +41,12 @@ if len(logger.handlers) == 0 :
     logger.addHandler(fh)
 
 #--------------------------------------------------------------------------------------------------
-#% Class definitions
+# Class definitions
 
 class EpicuriousSpider (scrapy.Spider) :
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # Class-specific constants
     name = "epicurious_spider"
-    css_str = ' div#sitemapItems'
-    xpath_ul_str = './/div/h3[contains(text(), "Recipes")]/following-sibling::ul'
-    xpath_recipelink_str = './/li/a/@href'
 
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # EpicuriousSpider.start_requests: Initiate the web-crawling process.
@@ -68,18 +65,31 @@ class EpicuriousSpider (scrapy.Spider) :
     #   self: Object instance
     #   response: Selector object provided by invoking parent method.
     def parse_sitemap (self, response) :
+        css_str = ' div#sitemapItems'
+        xpath_ul_str = './/div/h3[contains(text(), "Recipes")]/following-sibling::ul'
+        xpath_recipelink_str = './/li/a/@href'
         # Obtain URLs from Epicurious sitemap page.
         # (1) Since the HTML may not be well-formed, start with a CSS selector.
         # (2) Then select all <div>s following any <h3> tags that include the word 'recipe.'
         # (3) Then gather the URLs that are contained in individual list items.
-        sitemapitems = response.css(self.css_str).xpath(self.xpath_ul_str).xpath(self.xpath_recipelink_str)
-        logger.debug('Sitemapitems: {}'.format(sitemapitems.getall()))
-        # Follow each URL for receipes.
+        sitemapitems = response.css(css_str).xpath(xpath_ul_str).xpath(xpath_recipelink_str)
+        logger.debug(f'Sitemap items: {sitemapitems.getall()}')
+        # Follow each URL for recipes.
         for link in sitemapitems:
             yield response.follow(url = link, callback = self.parse_yearpage)
 
     def parse_yearpage (self, response) :
-        logger.debug(response.css(self.css_str).getall())
+        css_str = ' div#sitemapItems'
+        xpath_ul_str = './/div/h1[contains(text(), "Recipes")]/following-sibling::ul'
+        xpath_recipelink_str = './/li/a/@href'
+        xpath_nextpage_str = './/div[@class = "paginate"]/a[@title="Next page"]/@href'
+
+        recipeitems = response.css(css_str).xpath(xpath_ul_str).xpath(xpath_recipelink_str)
+        for recipe_link in recipeitems:
+            logger.debug(recipe_link.get())
+        # Is there another page for this year?
+        nextpageitems = response.css(css_str).xpath(xpath_nextpage_str)
+        logger.debug (f'Len Next Page Items: {len(nextpageitems)}')
 
 #--------------------------------------------------------------------------------------------------
 
