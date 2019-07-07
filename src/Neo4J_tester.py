@@ -14,6 +14,7 @@ from py2neo.database import Transaction
 # Open the food graph DB
 #food_db = Database(uri="bolt://localhost:7687")
 food_gr = Graph(auth=('neo4j', 'food'), host='localhost', port="7687", scheme='bolt')
+print(food_gr.database.name)
 
 ##--------------------------------------------------------------------------------------------------
 # Create basic relationships
@@ -28,23 +29,23 @@ print(len(x))
 # Delete the current Graph
 food_gr.delete_all()
 
-# tx = food_gr.begin()
-#
-# mac_n_cheese = Node("Recipe", name="Macaroni and Cheese")
-# tx.create(mac_n_cheese)
-# pasta = Node("Ingredient", name="elbow macaroni")
-# tx.create(pasta)
-# cheese = Node("Ingredient", name="shredded cheddar")
-# tx.create(cheese)
-# milk = Node("Ingredient", name="milk")
-# tx.create(milk)
-#
-# rels = {
-#     "r1": Relationship(pasta, 'IS_USED_IN', mac_n_cheese)
-# }
-#
-# tx.create(rels["r1"])
-# tx.commit()
-# print(food_gr.exists(rels["r1"]))
-#
-# print(rels['r1'])
+tx = food_gr.begin()
+
+mac_n_cheese = Node("Recipe", name="Macaroni and Cheese")
+tx.create(mac_n_cheese)
+pasta = Node("Ingredient", name="elbow macaroni")
+tx.create(pasta)
+cheese = Node("Ingredient", name="shredded cheddar")
+tx.create(cheese)
+milk = Node("Ingredient", name="milk")
+tx.create(milk)
+
+rels = {
+    "r1": Relationship(pasta, 'IS_USED_IN', mac_n_cheese)
+}
+
+tx.create(rels["r1"])
+tx.commit()
+print(food_gr.exists(rels["r1"]))
+
+print(rels['r1'])

@@ -1,0 +1,8 @@
+neo4j-database:
+  name: food
+  dbversion: 0.01
+  user: neo4j
+  pw: food
+  host: localhost
+  port: '7687'
+  scheme: bolt
