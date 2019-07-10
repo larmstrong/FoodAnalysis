@@ -19,7 +19,7 @@ LOGFILENAME = 'epicurious_spider.log'
 
 # Create a logger object
 logger = logging.getLogger('epicurious_spider_log')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # Only do the handler work if none already exists.
 if len(logger.handlers) == 0 :
@@ -55,7 +55,7 @@ class EpicuriousSpider (scrapy.Spider) :
     def start_requests (self) :
         urls = ['https://www.epicurious.com/services/sitemap']
         for url in urls :
-            logger.debug('***\n{}'.format(url))
+            logger.info('***\n{}'.format(url))
             yield scrapy.Request(url=url, callback=self.parse_sitemap)
 
 
@@ -69,36 +69,37 @@ class EpicuriousSpider (scrapy.Spider) :
         css_str = ' div#sitemapItems'
         xpath_ul_str = './/div/h3[contains(text(), "Recipes")]/following-sibling::ul'
         xpath_recipelink_str = './/li/a/@href'
-        
+
         # Obtain URLs from year-based sets of recipes from the Epicurious sitemap page.
         # (1) Since the HTML may not be well-formed, start with a CSS selector.
         # (2) Then select all <div>s following any <h3> tags that include the word 'recipe.'
         # (3) Then gather the URLs that are contained in individual list items.
         sitemapitems = response.css(css_str).xpath(xpath_ul_str).xpath(xpath_recipelink_str)
-        logger.debug(f'Sitemap items: {sitemapitems.getall()}')
+        logger.info(f'Sitemap items: {sitemapitems.getall()}')
         # Follow each URL for recipes.
         for link in sitemapitems:
             yield response.follow(url = link, callback = self.parse_yearpage)
+
 
     def parse_yearpage (self, response) :
         css_str = ' div#sitemapItems'
         xpath_ul_str = './/div/h1[contains(text(), "Recipes")]/following-sibling::ul'
         xpath_recipelink_str = './/li/a/@href'
         xpath_nextpage_str = './/div[@class = "paginate"]/a[@title="Next page"]/@href'
-        
+
         # Obtain URLs for all recipes on a page
         recipeitems = response.css(css_str).xpath(xpath_ul_str).xpath(xpath_recipelink_str)
-        logger.debug(recipeitems.getall())
+        logger.info(recipeitems.getall())
         for recipe_link in recipeitems:
             pass
 
         # Is there another page for this year?
         nextpageitems = response.css(css_str).xpath(xpath_nextpage_str)
-        logger.debug (f'Next Page: { nextpageitems.get() }')
+        logger.info (f'Next Page: { nextpageitems.get() }')
         if len(nextpageitems) > 0 :
             nextpage_link = nextpageitems.get()
             yield response.follow(url = nextpage_link, callback = self.parse_yearpage)
-        
+
     def parse_recipe (self, response) :
         pass
 
