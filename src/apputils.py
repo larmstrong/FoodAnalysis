@@ -13,6 +13,29 @@ import logging
 import os
 import yaml
 
+
+#--------------------------------------------------------------------------------------------------
+# Define classes
+
+# Counter class
+class IncrementDecrementCounter :
+
+    def __init__(self) :
+        # Class-specific attributes
+        self.counter = 0
+
+    def increment (self, by = 1):
+        self.counter = self.counter + by
+        return self.counter
+
+    def decrement (self, by = 1):
+        self.counter = self.counter - by
+        return self.counter
+
+    def get_value (self) :
+        return self.counter
+
+
 #--------------------------------------------------------------------------------------------------
 # Define module constants
 
@@ -54,48 +77,3 @@ def set_configuration (cfg) :
 def get_configuration () :
     global _configuration
     return _configuration
-
-#--------------------------------------------------------------------------------------------------
-# Define exported configuration functions
-
-def create_logger () :
-    """
-    create_logger: Creates an application-specific logger with output to the console and to a file.
-    """
-    # Get the application logger name from the configuration.
-    food_config = get_configuration()
-    logger_config = food_config['logging']
-    logname = logger_config['log-name']
-
-    # Create a logger object
-    logger = logging.getLogger(logname)
-    logger.setLevel(logging.INFO)
-
-    # Define the logging handlers.
-    # Only do the handler work if none already exists.
-    #if len(logger.handlers) == 0 :
-    # Get the default console handler.
-    ch = logging.StreamHandler()
-
-    # Create a file handler as well
-    logpath = os.path.join(_app_directory, logname + '.txt')
-    fh = logging.FileHandler(logpath)
-    fh.setLevel(logging.INFO)
-
-    # Create a formatter and add it to the handlers
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s : %(message)s')
-    ch.setFormatter(formatter)
-    fh.setFormatter(formatter)
-
-    # Add the handlers to logger
-    logger.addHandler(ch)
-    logger.addHandler(fh)
-
-    return logger
-
-def get_logger () :
-    cfg = get_configuration()
-    logcfg = cfg['logging']
-    loggername = logcfg['log-name']
-    logger = logging.getLogger(name=loggername)
-    return logger

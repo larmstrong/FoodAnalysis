@@ -1,71 +1,82 @@
-#--------------------------------------------------------------------------------------------------
-#% Import Libraries
+"""
+Epicurious spider processes and addition webscraping code.
+"""
 
+# -------------------------------------------------------------------------------------------------
+# Import Libraries
+
+# Simple imports
 import logging
+import py2neo
 import os
 import scrapy
 
+# Selective imports
+from collections import Counter
 from scrapy.crawler import CrawlerProcess
+
 
 #--------------------------------------------------------------------------------------------------
 # Define Constants
 
+MAX_DIRECTORY_PAGES = 100
+MAX_RECIPES = 100
+
+#--------------------------------------------------------------------------------------------------
+# Global variable and object definitions
+
 # Directory and filename constants.
-CURRENTDIR = os.path.dirname(os.path.realpath(os.curdir))     # Current working directory
-LOGFILENAME = 'epicurious_spider.log'
+current_directory = os.path.realpath(os.curdir)     # Current working directory
+src_directory = os.path.join(current_directory, "src")
 
-#--------------------------------------------------------------------------------------------------
-# Set up Logging
+n_recipes = 0
 
-# Create a logger object
 logger = logging.getLogger('epicurious_spider_log')
-logger.setLevel(logging.INFO)
 
-# Only do the handler work if none already exists.
-if len(logger.handlers) == 0 :
-    # Get the default console handler.
-    ch = logging.StreamHandler()
-
-    # Create a file handler as well
-    logpath = os.path.join(CURRENTDIR, LOGFILENAME)
-    fh = logging.FileHandler(logpath)
-    fh.setLevel(logging.INFO)
-
-    # Create a formatter and add it to the handlers
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s : %(message)s')
-    ch.setFormatter(formatter)
-    fh.setFormatter(formatter)
-
-    # Add the handlers to logger
-    logger.addHandler(ch)
-    logger.addHandler(fh)
-
-#--------------------------------------------------------------------------------------------------
-# Class definitions
+# Spider class
 
 class EpicuriousSpider (scrapy.Spider) :
-    #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
     # Class-specific constants
     name = "epicurious_spider"
 
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    # EpicuriousSpider.start_requests: Initiate the web-crawling process.
-    # Parameters:
-    #   self: Object instance
-    def start_requests (self) :
-        urls = ['https://www.epicurious.com/services/sitemap']
-        for url in urls :
-            logger.info('***\n{}'.format(url))
-            yield scrapy.Request(url=url, callback=self.parse_sitemap)
-
+    def __init__(self, gdb) :
+        """
+        EpicuriousSpider.__init__: Create a new spider object for the Epicurious website.
+        Parameters:
+          self: Object instance
+          gdb: Graph database to read/write.
+        """
+        logger.info(f'Creating new EpicuriousSpider for {gdb.database.name}')
+        # Assign the passed-in graph database.
+        self.gdb = gdb
+        self.n_directory_pages = 0
 
     #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    # EpicuriousSpider.parse_sitemap: Process the basic web structure of the Epicurious.com
-    #   sitemap. The primary flow is to obtain a list of year-organized URLs and then crawl each URL.
-    # Parameters:
-    #   self: Object instance
-    #   response: Selector object provided by invoking parent method.
+    def start_requests (self) :
+        """
+        EpicuriousSpider.start_requests: Initiate the web-crawling process.
+
+        Parameters:
+            self: Object instance
+        """
+        logger.info('Starting Epicurious crawler process.')
+        urls = ['https://www.epicurious.com/services/sitemap']
+        for url in urls :
+            logger.info(f'***{url}')
+            yield scrapy.Request(url=url, callback=self.parse_sitemap)
+
+    #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     def parse_sitemap (self, response) :
+        """
+        Process the basic web structure of the Epicurious.com sitemap.
+        The flow obtains a list of year-organized URLs and then crawls each URL.
+
+        Parameters:
+            self: Object instance
+            response: Selector object provided by invoking parent method.
+        """
         css_str = ' div#sitemapItems'
         xpath_ul_str = './/div/h3[contains(text(), "Recipes")]/following-sibling::ul'
         xpath_recipelink_str = './/li/a/@href'
@@ -78,10 +89,40 @@ class EpicuriousSpider (scrapy.Spider) :
         logger.info(f'Sitemap items: {sitemapitems.getall()}')
         # Follow each URL for recipes.
         for link in sitemapitems:
-            yield response.follow(url = link, callback = self.parse_yearpage)
+            if self.n_directory_pages <= MAX_DIRECTORY_PAGES :
+                yield response.follow(url = link, callback = self.parse_yearpage)
+            else:
+                return
 
-
+    #- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     def parse_yearpage (self, response) :
+        """
+        Process a single year-based recipe directory page.
+        The flow obtains a list of year-recipe URLs and then crawls each URL.
+
+        Parameters:
+            self: Object instance
+            response: Selector object provided by invoking parent method.
+        """
+        # Log iteration
+        logger.info(f'parse_yearpage for {response.request.url}')
+
+        # Increment number of directory pages traveled.
+        self.n_directory_pages = self.n_directory_pages + 1
+        # Do not process further if the max counts have been passed.
+        if self.n_directory_pages > MAX_DIRECTORY_PAGES :
+            logger.info(f'Passed threshold of directory pages. ({self.n_directory_pages})')
+            return
+
+        # Create a recipe directory node
+        logger.info(f'Creating new recipe page node in {self.gdb.database.name}')
+        tx = py2neo.begin()
+        rdir = py2neo.Node("RecipeDirectory", url=response.request.url)
+        tx.py2neo.create(rdir)
+        tx.commit()
+        if not food_db.exists(rdir) :
+            logger.error(f'Recipe directory {response.request.url} was not created. :()')
+
         css_str = ' div#sitemapItems'
         xpath_ul_str = './/div/h1[contains(text(), "Recipes")]/following-sibling::ul'
         xpath_recipelink_str = './/li/a/@href'
@@ -105,6 +146,14 @@ class EpicuriousSpider (scrapy.Spider) :
 
 #--------------------------------------------------------------------------------------------------
 
-spider_process = scrapy.crawler.CrawlerProcess()
-spider_process.crawl(EpicuriousSpider)
-spider_process.start()
+
+if __name__ == '__main__':
+    # Initialize logging.
+    logcfg_path = os.path.join(src_directory, 'logging.config')
+    print(logcfg_path)
+    logging.config.fileConfig(logcfg_path)
+    logger.info(f'***Start from epicurious_spider.py***')
+    # Invoke the main function.
+    spider_process = scrapy.crawler.CrawlerProcess()
+    spider_process.crawl(EpicuriousSpider)
+    spider_process.start()

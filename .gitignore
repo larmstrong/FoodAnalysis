@@ -1,5 +1,5 @@
-# Local files
-epicurious_log.txt
+# Local log files
+epicurious_spider.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

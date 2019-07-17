@@ -6,5 +6,3 @@ neo4j-database:
   host: localhost
   port: '7687'
   scheme: bolt
-logging:
-  log-name: epicurious_log
